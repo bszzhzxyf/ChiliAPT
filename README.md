@@ -8,6 +8,23 @@ cd chiliapt
 pip install .
 ```
 
+##使用
+
+```
+from chiliapt import ChiliAPT
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.time import Time
+
+# M1蟹状星云ra,dec坐标 05:34:31.8 +22:01:03
+c1= SkyCoord("05:34:31.8 +22:01:03",unit=(u.hourangle, u.deg), frame="icrs")
+ra_p = c1.ra.deg       #中心指向的ra
+dec_p = c1.dec.deg     # 中心指向的dec
+PA_p = 0               # Position Angle
+save_path = './APT_result/' # 生成的图片保存的路径
+apt = ChiliAPT(ra_p,dec_p, PA=PA_p,observe_time =Time('2024-11-11'),save_path=save_path,plot_stars=True)  
+```
+
 ## 功能
 输入Chili IFU中心指向的的ra、dec、PA角
 输出: 1. IFU和导星在dss星图上的位置
