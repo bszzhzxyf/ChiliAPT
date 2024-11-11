@@ -36,4 +36,6 @@ apt = ChiliAPT(ra_p,dec_p, PA=PA_p,observe_time =Time('2024-11-11'),save_path=sa
       4. Gaia星表投影在Guide上的位置,越亮的星越大
       ![Guide](./APT_result/Guider.jpg)
 
+这里绘制的Guider是竖着的，是因为RA是沿着Guider的短边方向的。实际读出的Guider图像是横向的。得旋转90度才能和本图像对应。
+
 详情请参考chiliapt_example.ipynb，以观测蟹状星云M1为例
