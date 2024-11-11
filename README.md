@@ -17,6 +17,6 @@ pip install .
       3. Gaia星表投影在IFU上的位置,越亮的星越大
       ![IFU](./APT_result/IFU.jpg)
       4. Gaia星表投影在Guide上的位置,越亮的星越大
-      ![Guide](./APT_result/Guide.jpg)
+      ![Guide](./APT_result/Guider.jpg)
 
 详情请参考chiliapt_example.ipynb，以观测蟹状星云M1为例
