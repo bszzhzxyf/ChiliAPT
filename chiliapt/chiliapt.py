@@ -24,6 +24,9 @@ from astropy.time import Time
 import pandas as pd
 from astroquery.hips2fits import hips2fits
 from matplotlib.colors import Colormap
+import time
+from requests.exceptions import ReadTimeout
+
 
 class ChiliAPT():
     """
@@ -110,8 +113,6 @@ class ChiliAPT():
         })
 
         self.hips_url = 'CDS/P/DSS2/color'
-        import time
-        from requests.exceptions import ReadTimeout
 
         max_retries = 5
         for attempt in range(max_retries):
