@@ -13,7 +13,7 @@ pip install . --user
 pip uninstall chiliapt
 ```
 
-##使用
+## 使用
 
 ```
 from chiliapt import ChiliAPT
