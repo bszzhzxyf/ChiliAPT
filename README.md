@@ -40,7 +40,7 @@ apt = ChiliAPT(ra_p=ra_p,
 ```
 
 ## 功能
-输入Chili IFU中心指向的的ra、dec、PA角
+输入Chili IFU或导星中心指向的的ra、dec、PA角
 输出: 1. IFU和导星在dss星图上的位置
       ![Chili Sky](./APT_result/ChiliSky.jpg)
       2.IFU和导星视场内的dss星图，以及中心指向
@@ -59,5 +59,6 @@ apt = ChiliAPT(ra_p=ra_p,
 
 
 ## 更新记录:
-2024-11-12 增加以导星为中心的指向功能
-           分别输出IFU和导星视场内的dss星图，以及中心指向
+2024-11-12,v 1.0.1:
+1.增加以导星为中心的指向功能
+2.分别输出IFU和导星视场内的dss星图，以及中心指向
