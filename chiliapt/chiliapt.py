@@ -110,14 +110,26 @@ class ChiliAPT():
         })
 
         self.hips_url = 'CDS/P/DSS2/color'
-        self.hipsimg = np.flipud(hips2fits.query_with_wcs(
-                                hips=self.hips_url,
-                                wcs=self.wcs,
-                                get_query_payload=False,
-                                format='jpg',
-                                min_cut=0,
-                                max_cut=99.9
-                                ))
+        import time
+        from requests.exceptions import ReadTimeout
+
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                self.hipsimg = np.flipud(hips2fits.query_with_wcs(
+                                        hips=self.hips_url,
+                                        wcs=self.wcs,
+                                        get_query_payload=False,
+                                        format='jpg',
+                                        min_cut=0,
+                                        max_cut=99.9
+                                        ))
+                break
+            except ReadTimeout:
+                print(f"尝试 {attempt + 1} 失败，正在重试...")
+                time.sleep(2)
+        else:
+            raise Exception("多次尝试后仍然无法获取hips图像")
         # 各个仪器的参数:
         '''
         导星视场 :  240.6 x 319.8 角秒 / 4.01 x 5.33角分 /  0.0668 x 0.0888 度
@@ -478,14 +490,6 @@ class ChiliAPT():
             'CD2_1': pixel_size *np.sin(self.PA*np.pi/180),      # coordinate transformation matrix element
             'CD2_2': pixel_size *np.cos(self.PA*np.pi/180)   # coordinate transformation matrix element
         })
-
-        self.guider_hips = np.flipud(hips2fits.query_with_wcs(
-        hips=self.hips_url,
-        wcs=self.guider_wcs,
-        get_query_payload=False,
-        format='jpg',
-        min_cut=0,
-        max_cut=99.9))
         
         ifu_pixel_size = 0.0180 / 650 # pixel size in degree of guider image
         self.ifu_wcs = astropy_wcs.WCS(header={
@@ -506,13 +510,38 @@ class ChiliAPT():
             'CD2_2': ifu_pixel_size *np.cos(self.PA*np.pi/180)   # coordinate transformation matrix element
         })
 
-        self.ifu_hips = np.flipud(hips2fits.query_with_wcs(
-        hips=self.hips_url,
-        wcs=self.ifu_wcs,
-        get_query_payload=False,
-        format='jpg',
-        min_cut=0,
-        max_cut=99.9))
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                self.guider_hips = np.flipud(hips2fits.query_with_wcs(
+                    hips=self.hips_url,
+                    wcs=self.guider_wcs,
+                    get_query_payload=False,
+                    format='jpg',
+                    min_cut=0,
+                    max_cut=99.9))
+                break
+            except ReadTimeout:
+                print(f"获取Guider图像尝试 {attempt + 1} 失败，正在重试...")
+                time.sleep(2)
+        else:
+            raise Exception("多次尝试后仍然无法获取Guider图像")
+
+        for attempt in range(max_retries):
+            try:
+                self.ifu_hips = np.flipud(hips2fits.query_with_wcs(
+                    hips=self.hips_url,
+                    wcs=self.ifu_wcs,
+                    get_query_payload=False,
+                    format='jpg',
+                    min_cut=0,
+                    max_cut=99.9))
+                break
+            except ReadTimeout:
+                print(f"获取IFU图像尝试 {attempt + 1} 失败，正在重试...")
+                time.sleep(2)
+        else:
+            raise Exception("多次尝试后仍然无法获取IFU图像")
 
     def plot_fp(self):
         fig, ax = plt.subplots(figsize=(10,10))
