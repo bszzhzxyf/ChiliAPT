@@ -1,15 +1,17 @@
 """
 Name:           ChiliAPT.py
 Description:    Class for simulate star position on Chili focalplane
-输入ifu的ra、dec
+输入ifu的ra、dec、PA
 输出: 1. IFU和导星在dss星图上的位置
       2. Gaia星表投影在chili焦面上
       3. Gaia星表分别投影在IFU和Guider上的位置 
 Author:         Yifei Xiong
 Created:        2024-11-9
 Modified-History:
+2024-11-12 添加了设置导星为中心指向的功能
 """
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon as MatplotlibPolygon
 import shapely
@@ -23,8 +25,6 @@ import pandas as pd
 from astroquery.hips2fits import hips2fits
 from matplotlib.colors import Colormap
 
-import numpy as np
-
 class ChiliAPT():
     """
     Class for simulate imaging stars on Chili focalplane
@@ -35,18 +35,40 @@ class ChiliAPT():
     Parameters
     ----------
     ra_p : float
-        ra pointing of IFU center
+        ra pointing of the center of IFU/Guider, unit deg
+        IFU/Guider中心的赤经指向，单位为度
+        
     dec_p : float
-        dec pointing of IFU center
+        dec pointing of the center of IFU/Guider, unit deg
+        IFU/Guider中心的赤纬指向，单位为度
+        
     PA : float
-        Position Angle of Focal plane 
+        Position Angle of Focal plane, unit deg
+        焦平面的位置角，单位为度
+        
+    center : str, optional
+        Instrument set to center pointing, default is "IFU", optional "Guider"
+        设置中心指向的仪器，默认为 "IFU", 可选 "Guider"
+        
     observe_time : Time, optional
-        观测时间，默认为 Time('2025-10-1')
+        Observation time, default is Time('2024-11-11')
+        观测时间，默认为 Time('2024-11-11')
+        
     save_path : str, optional
+        Image save path, default is None
         图片保存路径，默认为 None
+        格式为'./APT_result/',注意结尾要加'/'
+    
+    plot_sky : bool, optional
+        Whether to plot sky map, default is True
+        是否绘制天球图，默认为 True
+        
     plot_stars : bool, optional
-        是否绘制星图，默认为 False
+        Whether to plot star map, default is True
+        是否绘制星图，默认为 True
+        
     random_transform : bool, optional
+        Whether to add random offset, default is False
         是否添加随机偏移，默认为 False
     
     Attributes
@@ -57,8 +79,10 @@ class ChiliAPT():
 
     """
 
-    def __init__(self, ra_p, dec_p, PA, observe_time = Time('2024-11-11'),
-                 random_transform= False, save_path=None, plot_stars = False):
+    def __init__(self, ra_p, dec_p, PA, center = "IFU", observe_time = Time('2024-11-11'),
+                  save_path=None, plot_sky = True, plot_stars = True, random_transform= False):
+        if save_path and not os.path.exists(save_path):
+            os.makedirs(save_path)
         self.ra_p = ra_p
         self.dec_p = dec_p
         self.PA = PA
@@ -85,9 +109,9 @@ class ChiliAPT():
             'CD2_2': 2/3600      # coordinate transformation matrix element
         })
 
-        hips_url = 'CDS/P/DSS2/color'
+        self.hips_url = 'CDS/P/DSS2/color'
         self.hipsimg = np.flipud(hips2fits.query_with_wcs(
-                                hips=hips_url,
+                                hips=self.hips_url,
                                 wcs=self.wcs,
                                 get_query_payload=False,
                                 format='jpg',
@@ -101,20 +125,30 @@ class ChiliAPT():
         两者距离   66.6mm / 11.93分 / 0.1989度
         底片比例:  10.74296875 角秒 /mm
         '''
-        # IFU 
-        self.xy0_IFU = (0,0)
-        self.FOV_IFU = (0.0180, 0.0197)
-        
-        # Guider
-        self.xy0_Guider = (0.1989, 0) 
-        self.FOV_Guider = (0.0668, 0.0888)
-        
+        if center == "IFU":
+            # IFU 
+            self.xy0_IFU = (0,0)
+            self.FOV_IFU = (0.0180, 0.0197)
+            
+            # Guider
+            self.xy0_Guider = (0.1989, 0) 
+            self.FOV_Guider = (0.0668, 0.0888)
+        if center == "Guider":
+            # Guider
+            self.xy0_Guider = (0,0)
+            self.FOV_Guider = (0.0668, 0.0888)
+            # IFU
+            self.xy0_IFU = (-0.1989, 0) 
+            self.FOV_IFU = (0.0180, 0.0197)
 
         self.APT_main()
 
+        if plot_sky is True:
+            self.plot_sky()
+            self.plot_IFUsky()
+            self.plot_Guidersky()
         if plot_stars is True:
             self.plot_fp()
-            self.plot_sky()
             self.plot_inst("IFU")
             self.plot_inst("Guider")
              
@@ -297,7 +331,7 @@ class ChiliAPT():
     def gaiadr3_query(self,ra: list,
                       dec: list,
                       rad: float = 1.0,
-                      maxmag: float = 25,
+                      maxmag: float = 16,
                       maxsources: float = 10000000):
         """
         Acquire the Gaia DR3, from work of zhang tianmeng
@@ -417,6 +451,69 @@ class ChiliAPT():
         self.phi0_Guider, self.theta0_Guider = self.fpprojp_to_fpnativesky(np.array([self.xi0_Guider]),np.array([self.eta0_Guider]))
         self.ra0_Guider,  self.dec0_Guider = self.fpnativesky_to_sky(self.phi0_Guider, self.theta0_Guider, self.ra_p, self.dec_p, self.phi_p)
 
+        # IFU中心指向输出
+        ifu_coord = SkyCoord(ra=self.ra0_IFU[0]*u.deg, dec=self.dec0_IFU[0]*u.deg, frame='icrs')
+        self.ra_dec_IFU_text = f"IFU Center: RA={ifu_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={ifu_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}"
+        print(self.ra_dec_IFU_text)
+        # Guider中心指向输出
+        guider_coord = SkyCoord(ra=self.ra0_Guider[0]*u.deg, dec=self.dec0_Guider[0]*u.deg, frame='icrs')
+        self.ra_dec_Guider_text = f"Guider Center: RA={guider_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={guider_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}"
+        print(self.ra_dec_Guider_text)
+
+        pixel_size = 0.0668 / 700 # pixel size in degree of guider image
+        self.guider_wcs = astropy_wcs.WCS(header={
+            'NAXIS1':                 700 ,  # Width of the output fits/image
+            'NAXIS2':                 934,  # Height of the output fits/image
+            'WCSAXES':                   2,  # Number of coordinate axes
+            'CRPIX1':                350.5, # Pixel coordinate of reference point
+            'CRPIX2':                467.5,  # Pixel coordinate of reference point
+            'CUNIT1': 'deg',                 # Units of coordinate increment and value
+            'CUNIT2': 'deg',                 # Units of coordinate increment and value
+            'CTYPE1': 'RA---TAN'          ,     # right ascension, gnomonic projection
+            'CTYPE2': 'DEC--TAN'          ,     # declination, gnomonic projection
+            'CRVAL1': self.ra0_Guider[0]                ,     # RA of reference point
+            'CRVAL2': self.dec0_Guider[0]              ,     # DEC of reference point
+            'CD1_1':  -pixel_size *np.cos(self.PA*np.pi/180)  ,# coordinate transformation matrix element
+            'CD1_2':  pixel_size *np.sin(self.PA*np.pi/180)  ,     # coordinate transformation matrix element
+            'CD2_1': pixel_size *np.sin(self.PA*np.pi/180),      # coordinate transformation matrix element
+            'CD2_2': pixel_size *np.cos(self.PA*np.pi/180)   # coordinate transformation matrix element
+        })
+
+        self.guider_hips = np.flipud(hips2fits.query_with_wcs(
+        hips=self.hips_url,
+        wcs=self.guider_wcs,
+        get_query_payload=False,
+        format='jpg',
+        min_cut=0,
+        max_cut=99.9))
+        
+        ifu_pixel_size = 0.0180 / 650 # pixel size in degree of guider image
+        self.ifu_wcs = astropy_wcs.WCS(header={
+            'NAXIS1':                 650 ,  # Width of the output fits/image
+            'NAXIS2':                 710 ,  # Height of the output fits/image
+            'WCSAXES':                   2,  # Number of coordinate axes
+            'CRPIX1':                325.5, # Pixel coordinate of reference point
+            'CRPIX2':                355.5,  # Pixel coordinate of reference point
+            'CUNIT1': 'deg',                 # Units of coordinate increment and value
+            'CUNIT2': 'deg',                 # Units of coordinate increment and value
+            'CTYPE1': 'RA---TAN'          ,     # right ascension, gnomonic projection
+            'CTYPE2': 'DEC--TAN'          ,     # declination, gnomonic projection
+            'CRVAL1': self.ra0_IFU[0]                ,     # RA of reference point
+            'CRVAL2': self.dec0_IFU[0]              ,     # DEC of reference point
+            'CD1_1':  -ifu_pixel_size *np.cos(self.PA*np.pi/180)  ,# coordinate transformation matrix element
+            'CD1_2':  ifu_pixel_size *np.sin(self.PA*np.pi/180)  ,     # coordinate transformation matrix element
+            'CD2_1': ifu_pixel_size *np.sin(self.PA*np.pi/180),      # coordinate transformation matrix element
+            'CD2_2': ifu_pixel_size *np.cos(self.PA*np.pi/180)   # coordinate transformation matrix element
+        })
+
+        self.ifu_hips = np.flipud(hips2fits.query_with_wcs(
+        hips=self.hips_url,
+        wcs=self.ifu_wcs,
+        get_query_payload=False,
+        format='jpg',
+        min_cut=0,
+        max_cut=99.9))
+
     def plot_fp(self):
         fig, ax = plt.subplots(figsize=(10,10))
         # 绘制相机视场
@@ -450,19 +547,55 @@ class ChiliAPT():
         ax.text(self.IFU_polygon_sky[0][0], self.IFU_polygon_sky[0][1], 'IFU', color='#8B0000', transform=ax.get_transform('icrs'), fontsize=14)  # 增大文字大小
         ax.add_patch(MatplotlibPolygon(self.Guider_polygon_sky, facecolor='none', edgecolor='#2ECC40', alpha=0.9, transform=ax.get_transform('icrs')))
         ax.text(self.Guider_polygon_sky[0][0], self.Guider_polygon_sky[0][1], 'Guider', color='#2ECC40', transform=ax.get_transform('icrs'), fontsize=14)  # 增大文字大小
+        # 将IFU和Guider的中心指向转换为小时角和度数格式并显示
+        # IFU中心
+        ax.text(0.95, 0.95, self.ra_dec_IFU_text, transform=ax.transAxes, fontsize=12, ha='right', va='top', color='white', bbox=dict(facecolor='black', alpha=0.5))
+        # Guider中心
+        ax.text(0.95, 0.90, self.ra_dec_Guider_text, transform=ax.transAxes, fontsize=12, ha='right', va='top', color='white', bbox=dict(facecolor='black', alpha=0.5))
+
         ax.grid(color='white', ls='solid', alpha=0.3)
         ax.set_xlabel('RA', fontsize=14)  # 增大标签文字大小
         ax.set_ylabel('DEC', fontsize=14)  # 增大标签文字大小
+        plt.tight_layout()
         savename = self.save_path + "ChiliSky.jpg"
         plt.savefig(savename,dpi = 200)
+        plt.show()
+
+    def plot_IFUsky(self):
+        fig = plt.figure(figsize=(12, 12))
+        ax = plt.subplot(projection=self.ifu_wcs)
+        ax.imshow(self.ifu_hips, origin="lower")
+        ax.grid(color='white', ls='solid')
+        ax.set_xlabel('RA', fontsize=14)
+        ax.set_ylabel('DEC', fontsize=14)
+        plt.title(self.ra_dec_IFU_text, fontsize=14, color='white', bbox=dict(facecolor='black', alpha=0.5))
+        plt.tight_layout()
+        if self.save_path is not None:
+            savename = self.save_path + "IFUsky.jpg"
+            plt.savefig(savename, dpi=200)
+        plt.show()
+
+    def plot_Guidersky(self):
+        fig = plt.figure(figsize=(12, 12))
+        ax = plt.subplot(projection=self.guider_wcs)
+        ax.imshow(self.guider_hips, origin="lower")
+        ax.grid(color='white', ls='solid')
+        ax.set_xlabel('RA', fontsize=14)
+        ax.set_ylabel('DEC', fontsize=14)
+        plt.title(self.ra_dec_Guider_text, fontsize=14, color='white', bbox=dict(facecolor='black', alpha=0.5))
+        plt.tight_layout()
+        if self.save_path is not None:
+            savename = self.save_path + "Guidersky.jpg"
+            plt.savefig(savename, dpi=200)
         plt.show()
     
     def plot_inst_e(self,xi_in,eta_in,Gmag,inst_polygon,name):
         fig, ax = plt.subplots(figsize=(8,8))
         plt.title(name, fontsize = 18)
         ax.add_patch(MatplotlibPolygon(list(inst_polygon.exterior.coords[:-1]), facecolor='#FFB6C1', edgecolor='#8B0000',alpha =1))
-        sizes = (max(Gmag) - Gmag + 1) * 10  # 根据Gmag调整点的大小，Gmag越小，size越大
-        ax.scatter(xi_in, eta_in, c="k", marker="o", s=sizes, alpha=0.6)
+        if len(Gmag) > 0:
+            sizes = (max(Gmag) - Gmag + 1) * 10  # 根据Gmag调整点的大小，Gmag越小，size越大
+            ax.scatter(xi_in, eta_in, c="k", marker="o", s=sizes, alpha=0.6)
         ax.set_xlabel("X  (degree)", fontsize = 15)
         ax.set_ylabel("Y (degree)", fontsize = 15)
         ax.invert_xaxis()
