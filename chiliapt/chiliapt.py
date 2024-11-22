@@ -135,7 +135,7 @@ class ChiliAPT():
         '''
         导星视场 :  240.6 x 319.8 角秒 / 4.01 x 5.33角分 /  0.0668 x 0.0888 度
         Chili视场 :  65 x 71 角秒/ 1.083 * 1.183 角分 / 0.0180 x 0.0197 度
-        两者距离   66.6mm / 11.93分 / 0.1989度
+        两者距离   60.65mm / 10.8592分 / 0.180988度
         底片比例:  10.74296875 角秒 /mm
         '''
         if center == "IFU":
@@ -144,14 +144,14 @@ class ChiliAPT():
             self.FOV_IFU = (0.0180, 0.0197)
             
             # Guider
-            self.xy0_Guider = (0.1989, 0) 
+            self.xy0_Guider = (0.180988, 0) 
             self.FOV_Guider = (0.0668, 0.0888)
         if center == "Guider":
             # Guider
             self.xy0_Guider = (0,0)
             self.FOV_Guider = (0.0668, 0.0888)
             # IFU
-            self.xy0_IFU = (-0.1989, 0) 
+            self.xy0_IFU = (-0.180988, 0) 
             self.FOV_IFU = (0.0180, 0.0197)
 
         self.APT_main()
